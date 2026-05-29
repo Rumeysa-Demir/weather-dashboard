@@ -269,27 +269,21 @@ function App() {
                                         </div>
                                     </div>
 
-                                    {/* RADAR VISUAL FX */}
+                                    {/* LIVE INTERACTIVE RADAR MAP */}
                                     <div style={{
                                         height: '240px',
                                         borderRadius: '16px',
-                                        background: 'radial-gradient(circle, #1e3a8a 0%, #0f172a 100%)',
                                         position: 'relative',
                                         overflow: 'hidden',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        color: 'rgba(255,255,255,0.4)'
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
                                     }}>
-                                        <div style={{
-                                            position: 'absolute',
-                                            width: '180px',
-                                            height: '180px',
-                                            borderRadius: '50%',
-                                            border: '2px solid rgba(2, 132, 199, 0.4)',
-                                            boxShadow: '0 0 20px rgba(2, 132, 199, 0.2)'
-                                        }}></div>
-                                        <span style={{ zIndex: 2, fontWeight: '500', fontSize: '14px', letterSpacing: '1px' }}>📡 LIVE RADAR CORE ACTIVE</span>
+                                        <iframe
+                                            width="100%"
+                                            height="100%"
+                                            src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=${weatherData.lat}&lon=${weatherData.lon}`}
+                                            frameBorder="0"
+                                            title="Live Weather Radar"
+                                        ></iframe>
                                     </div>
                                 </div>
 

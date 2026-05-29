@@ -82,7 +82,9 @@ export const useWeather = (city) => {
                     humidity: `${currentData.main.humidity}%`,
                     dewPoint: `${Math.round(currentData.main.temp - ((100 - currentData.main.humidity) / 5))}°C`, // Standard scientific approximation
                     pressure: `${currentData.main.pressure} hPa`,
-                    forecast: formattedForecast
+                    forecast: formattedForecast,
+                    lat: lat, // <-- EKLENDÝ: Harita için Enlem
+                    lon: lon  // <-- EKLENDÝ: Harita için Boylam
                 });
 
             } catch (err) {
