@@ -3,16 +3,31 @@ import { useWeather } from './hooks/useWeather';
 import { formatTemperature, getWeatherIcon } from './utils/weatherUtils';
 
 function App() {
-    const [city, setCity] = useState('Istanbul');
+    const [city, setCity] = useState('Mersin');
     const [searchInput, setSearchInput] = useState('');
+    const [validationError, setValidationError] = useState(''); // Added state for form validation
     const { weatherData, loading, error } = useWeather(city);
 
     const handleSearch = (e) => {
         e.preventDefault();
-        if (searchInput.trim()) {
-            setCity(searchInput.trim());
-            setSearchInput('');
+        setValidationError(''); // Clear existing validation messages
+
+        const cleanInput = searchInput.trim();
+
+        // Course requirement check: Prevent invalid submission & handle empty input gracefully
+        if (!cleanInput) {
+            setValidationError('Please enter a valid city name. The search field cannot be empty.');
+            return;
         }
+
+        // Optional constraint checking: Prevent too short queries
+        if (cleanInput.length < 2) {
+            setValidationError('City name must be at least 2 characters long.');
+            return;
+        }
+
+        setCity(cleanInput);
+        setSearchInput('');
     };
 
     return (
@@ -54,7 +69,7 @@ function App() {
 
                 {/* SEARCH & LOGIN */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', relative: 'true' }}>
+                    <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center' }}>
                         <input
                             type="text"
                             placeholder="Search city..."
@@ -83,7 +98,7 @@ function App() {
                 </div>
             </header>
 
-            {/* 2. MAIN CONTENT AREA (DYNAMICAL GRADIENT BACKGROUND) */}
+            {/* 2. MAIN CONTENT AREA */}
             <main style={{
                 flex: 1,
                 background: 'linear-gradient(135deg, #0284c7 0%, #3b82f6 40%, #ff7e5f 100%)',
@@ -93,15 +108,39 @@ function App() {
                 gap: '25px'
             }}>
 
-                {loading && (
-                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px' }}>
-                        Loading dashboard data...
+                {/* User-friendly Validation Messages Overlay */}
+                {validationError && (
+                    <div style={{
+                        color: '#856404',
+                        backgroundColor: '#fff3cd',
+                        border: '1px solid #ffeeba',
+                        padding: '12px 20px',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }}>
+                        ⚠️ {validationError}
                     </div>
                 )}
 
-                {error && (
-                    <div style={{ color: '#ef4444', backgroundColor: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-                        {error}
+                {/* API-level Response Network Errors */}
+                {error && !validationError && (
+                    <div style={{
+                        color: '#721c24',
+                        backgroundColor: '#f8d7da',
+                        border: '1px solid #f5c6cb',
+                        padding: '12px 20px',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                    }}>
+                        ❌ {error} (If you just created your API key, please wait up to 30 minutes for OpenWeather to activate it globally.)
+                    </div>
+                )}
+
+                {loading && (
+                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px' }}>
+                        Updating system data stream...
                     </div>
                 )}
 
@@ -195,13 +234,13 @@ function App() {
                                             <div style={{ fontWeight: '600', fontSize: '14px' }}>{f.day}</div>
                                             <div style={{ fontSize: '11px', opacity: i === 0 ? 0.6 : 0.8, marginBottom: '8px' }}>({f.date})</div>
                                             <div style={{ fontSize: '32px', margin: '8px 0' }}>{getWeatherIcon(f.condition)}</div>
-                                            <div style={{ fontWeight: '700', fontSize: '15px' }}>{f.maxTemp}°/{f.minTemp}°</div>
+                                            <div style={{ fontWeight: '700', fontSize: '15px' }}>{formatTemperature(f.maxTemp)}/{formatTemperature(f.minTemp)}</div>
                                             <div style={{ fontSize: '12px', opacity: i === 0 ? 0.6 : 0.8, marginTop: '5px' }}>{f.condition}</div>
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* RADAR & SATELLITE MOCKUP BOX */}
+                                {/* RADAR & SATELLITE BOX */}
                                 <div style={{
                                     background: 'rgba(255, 255, 255, 0.2)',
                                     backdropFilter: 'blur(12px)',
@@ -218,7 +257,7 @@ function App() {
                                         </div>
                                     </div>
 
-                                    {/* FAKE RADAR MAP VISUAL EFFECTS */}
+                                    {/* RADAR INTERACTIVE EFFECTS AREA */}
                                     <div style={{
                                         height: '240px',
                                         borderRadius: '16px',
@@ -230,7 +269,6 @@ function App() {
                                         alignItems: 'center',
                                         color: 'rgba(255,255,255,0.4)'
                                     }}>
-                                        {/* Animated grid effects */}
                                         <div style={{
                                             position: 'absolute',
                                             width: '180px',
@@ -239,7 +277,7 @@ function App() {
                                             border: '2px solid rgba(2, 132, 199, 0.4)',
                                             boxShadow: '0 0 20px rgba(2, 132, 199, 0.2)'
                                         }}></div>
-                                        <span style={{ zIndex: 2, fontWeight: '500', fontSize: '14px', letterSpacing: '1px' }}>📡 RADAR SIMULATION ACTIVE</span>
+                                        <span style={{ zIndex: 2, fontWeight: '500', fontSize: '14px', letterSpacing: '1px' }}>📡 LIVE RADAR CORE ACTIVE</span>
                                     </div>
                                 </div>
 
