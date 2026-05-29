@@ -1,26 +1,27 @@
-﻿import React, { useState } from 'react';
+﻿// src/App.jsx
+
+import React, { useState } from 'react';
 import { useWeather } from './hooks/useWeather';
-import { formatTemperature, getWeatherIcon } from './utils/weatherUtils';
+import { formatTemperature, getWeatherIcon, getWeatherBackground } from './utils/weatherUtils';
 
 function App() {
     const [city, setCity] = useState('Mersin');
     const [searchInput, setSearchInput] = useState('');
-    const [validationError, setValidationError] = useState(''); // Added state for form validation
+    const [validationError, setValidationError] = useState('');
     const { weatherData, loading, error } = useWeather(city);
 
     const handleSearch = (e) => {
         e.preventDefault();
-        setValidationError(''); // Clear existing validation messages
+        setValidationError('');
 
         const cleanInput = searchInput.trim();
 
-        // Course requirement check: Prevent invalid submission & handle empty input gracefully
+        // Course requirement check: Validate input form behavior
         if (!cleanInput) {
             setValidationError('Please enter a valid city name. The search field cannot be empty.');
             return;
         }
 
-        // Optional constraint checking: Prevent too short queries
         if (cleanInput.length < 2) {
             setValidationError('City name must be at least 2 characters long.');
             return;
@@ -29,6 +30,11 @@ function App() {
         setCity(cleanInput);
         setSearchInput('');
     };
+
+    // Get the realistic image background layout
+    const dynamicBackgroundImage = weatherData && !loading
+        ? getWeatherBackground(weatherData.condition)
+        : getWeatherBackground('default');
 
     return (
         <div style={{
@@ -98,17 +104,23 @@ function App() {
                 </div>
             </header>
 
-            {/* 2. MAIN CONTENT AREA */}
+            {/* 2. MAIN CONTENT AREA (NOW FULL-SCREEN IMAGE BACKGROUND!) */}
+            {/* 2. MAIN CONTENT AREA (NOW FULL-SCREEN IMAGE BACKGROUND!) */}
             <main style={{
                 flex: 1,
-                background: 'linear-gradient(135deg, #0284c7 0%, #3b82f6 40%, #ff7e5f 100%)',
+                // Mixing a gentle dark linear overlay with the dynamic background image for premium contrast balance
+                // Cross-browser bulletproof background shorthand
+                background: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.35)), ${dynamicBackgroundImage} center/cover no-repeat`,
+                width: '100%', // <-- EKLENDİ: Genişliği %100 yap
                 padding: '40px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '25px'
+                gap: '25px',
+                boxSizing: 'border-box', // <-- EKLENDİ: Taşmaları önle
+                transition: 'background 0.6s ease-in-out' // Smooth transitions between weather photos
             }}>
 
-                {/* User-friendly Validation Messages Overlay */}
+                {/* Validation Error Banner */}
                 {validationError && (
                     <div style={{
                         color: '#856404',
@@ -134,20 +146,20 @@ function App() {
                         fontSize: '14px',
                         fontWeight: '500'
                     }}>
-                        ❌ {error} (If you just created your API key, please wait up to 30 minutes for OpenWeather to activate it globally.)
+                        ❌ {error}
                     </div>
                 )}
 
                 {loading && (
-                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px' }}>
-                        Updating system data stream...
+                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px', fontWeight: '500' }}>
+                        Syncing live satellite coordinates...
                     </div>
                 )}
 
                 {weatherData && !loading && (
                     <>
                         {/* CITY & DATE INFO */}
-                        <div style={{ color: 'white' }}>
+                        <div style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
                             <h2 style={{ margin: '0 0 5px 0', fontSize: '36px', fontWeight: '600' }}>{weatherData.cityName}</h2>
                             <p style={{ margin: 0, opacity: 0.9, fontSize: '15px' }}>{weatherData.dateStr}</p>
                         </div>
@@ -162,24 +174,24 @@ function App() {
 
                             {/* LEFT COLUMN: CURRENT WEATHER CARD */}
                             <div style={{
-                                background: 'rgba(255, 255, 255, 0.2)',
-                                backdropFilter: 'blur(12px)',
+                                background: 'rgba(0, 0, 0, 0.45)',
+                                backdropFilter: 'blur(16px)',
                                 borderRadius: '24px',
                                 padding: '40px 30px',
                                 color: 'white',
-                                border: '1px solid rgba(255,255,255,0.3)',
+                                border: '1px solid rgba(255,255,255,0.25)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+                                boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
                             }}>
-                                <div style={{ fontSize: '110px', lineHeight: 1, margin: '10px 0' }}>
+                                <div style={{ fontSize: '110px', lineHeight: 1, margin: '10px 0', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>
                                     {getWeatherIcon(weatherData.condition)}
                                 </div>
-                                <div style={{ fontSize: '72px', fontWeight: '700', margin: '10px 0' }}>
+                                <div style={{ fontSize: '72px', fontWeight: '700', margin: '10px 0', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                                     {formatTemperature(weatherData.temp)}
                                 </div>
-                                <div style={{ fontSize: '18px', opacity: 0.9, marginBottom: '30px' }}>
+                                <div style={{ fontSize: '18px', opacity: 0.9, marginBottom: '30px', fontWeight: '500' }}>
                                     Feeling like {formatTemperature(weatherData.feelsLike)}
                                 </div>
 
@@ -222,42 +234,42 @@ function App() {
                                 }}>
                                     {weatherData.forecast.map((f, i) => (
                                         <div key={i} style={{
-                                            background: i === 0 ? '#ffffff' : 'rgba(255,255,255,0.2)',
-                                            backdropFilter: 'blur(10px)',
-                                            color: i === 0 ? '#1e293b' : 'white',
+                                            background: 'rgba(0, 0, 0, 0.45)', // <-- Tüm kartlar için aynı koyu cam efekti
+                                            backdropFilter: 'blur(16px)',
+                                            color: 'white', // <-- Tüm metinler beyaz
                                             borderRadius: '16px',
                                             padding: '15px 10px',
                                             textAlign: 'center',
-                                            border: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.2)',
-                                            boxShadow: '0 10px 20px rgba(0,0,0,0.05)'
+                                            border: '1px solid rgba(255,255,255,0.2)',
+                                            boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
                                         }}>
-                                            <div style={{ fontWeight: '600', fontSize: '14px' }}>{f.day}</div>
-                                            <div style={{ fontSize: '11px', opacity: i === 0 ? 0.6 : 0.8, marginBottom: '8px' }}>({f.date})</div>
+                                            <div style={{ fontWeight: '700', fontSize: '14px' }}>{f.day}</div>
+                                            <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: '8px' }}>({f.date})</div>
                                             <div style={{ fontSize: '32px', margin: '8px 0' }}>{getWeatherIcon(f.condition)}</div>
                                             <div style={{ fontWeight: '700', fontSize: '15px' }}>{formatTemperature(f.maxTemp)}/{formatTemperature(f.minTemp)}</div>
-                                            <div style={{ fontSize: '12px', opacity: i === 0 ? 0.6 : 0.8, marginTop: '5px' }}>{f.condition}</div>
+                                            <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '5px', fontWeight: '500' }}>{f.condition}</div>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* RADAR & SATELLITE BOX */}
                                 <div style={{
-                                    background: 'rgba(255, 255, 255, 0.2)',
-                                    backdropFilter: 'blur(12px)',
+                                    background: 'rgba(0, 0, 0, 0.45)',
+                                    backdropFilter: 'blur(16px)',
                                     borderRadius: '24px',
                                     padding: '25px',
-                                    border: '1px solid rgba(255,255,255,0.3)',
-                                    boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'white' }}>
                                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Local Radar & Satellite</h3>
                                         <div style={{ display: 'flex', gap: '10px' }}>
                                             <span style={{ padding: '5px 12px', background: '#0284c7', borderRadius: '12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Air Pressure</span>
-                                            <span style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.3)', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>Satellite</span>
+                                            <span style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.25)', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>Satellite</span>
                                         </div>
                                     </div>
 
-                                    {/* RADAR INTERACTIVE EFFECTS AREA */}
+                                    {/* RADAR VISUAL FX */}
                                     <div style={{
                                         height: '240px',
                                         borderRadius: '16px',
