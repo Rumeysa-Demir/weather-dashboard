@@ -1,6 +1,4 @@
-﻿// src/App.jsx
-
-import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useWeather } from './hooks/useWeather';
 import { formatTemperature, getWeatherIcon, getWeatherBackground } from './utils/weatherUtils';
 
@@ -8,20 +6,60 @@ function App() {
     const [city, setCity] = useState('Mersin');
     const [searchInput, setSearchInput] = useState('');
     const [validationError, setValidationError] = useState('');
+
+    // Otomatik tamamlama (Autocomplete) State'leri
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
     const { weatherData, loading, error } = useWeather(city);
+
+    // Arama kutusuna yazı yazıldıkça Open-Meteo API'den canlı şehir tahminlerini çeker
+    useEffect(() => {
+        if (searchInput.trim().length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const fetchCities = async () => {
+            try {
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${searchInput}&count=5&language=en&format=json`);
+                const data = await res.json();
+
+                if (data.results) {
+                    setSuggestions(data.results);
+                } else {
+                    setSuggestions([]);
+                }
+                setShowSuggestions(true);
+            } catch (err) {
+                console.error("City search error:", err);
+            }
+        };
+
+        const timerId = setTimeout(() => {
+            fetchCities();
+        }, 300);
+
+        return () => clearTimeout(timerId);
+    }, [searchInput]);
+
+    const handleSelectCity = (cityName) => {
+        setCity(cityName);
+        setSearchInput('');
+        setShowSuggestions(false);
+        setValidationError('');
+    };
 
     const handleSearch = (e) => {
         e.preventDefault();
         setValidationError('');
-
         const cleanInput = searchInput.trim();
 
-        // Course requirement check: Validate input form behavior
         if (!cleanInput) {
-            setValidationError('Please enter a valid city name. The search field cannot be empty.');
+            setValidationError('Please enter a valid city name.');
             return;
         }
-
         if (cleanInput.length < 2) {
             setValidationError('City name must be at least 2 characters long.');
             return;
@@ -29,35 +67,20 @@ function App() {
 
         setCity(cleanInput);
         setSearchInput('');
+        setShowSuggestions(false);
     };
 
-    // Get the realistic image background layout
     const dynamicBackgroundImage = weatherData && !loading
         ? getWeatherBackground(weatherData.condition)
         : getWeatherBackground('default');
 
     return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: '100vh',
-            backgroundColor: '#f5f7fb',
-            fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-            margin: 0,
-            padding: 0,
-            boxSizing: 'border-box'
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f5f7fb', fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif', margin: 0, padding: 0, boxSizing: 'border-box' }}>
+               
 
-            {/* 1. HEADER SECTION */}
-            <header style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '15px 40px',
-                backgroundColor: '#ffffff',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-                zIndex: 10
-            }}>
+                {/* HEADER BÖLÜMÜ ... */}
+            {/* HEADER BÖLÜMÜ */}
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 40px', backgroundColor: '#ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '28px' }}>☀️</span>
                     <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#1e293b' }}>
@@ -73,236 +96,158 @@ function App() {
                     <span style={{ cursor: 'pointer' }}>Contact</span>
                 </nav>
 
-                {/* SEARCH & LOGIN */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                {/* SEARCH & AUTOCOMPLETE */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
                     <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center' }}>
                         <input
                             type="text"
                             placeholder="Search city..."
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
-                            style={{
-                                padding: '8px 15px',
-                                borderRadius: '20px',
-                                border: '1px solid #cbd5e1',
-                                outline: 'none',
-                                fontSize: '14px',
-                                width: '180px',
-                                transition: 'all 0.3s'
-                            }}
+                            style={{ padding: '8px 15px', borderRadius: '20px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px', width: '180px', transition: 'all 0.3s' }}
                         />
                     </form>
-                    <button style={{
-                        padding: '8px 20px',
-                        borderRadius: '20px',
-                        border: 'none',
-                        backgroundColor: '#0284c7',
-                        color: 'white',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                    }}>Login</button>
+
+                    {showSuggestions && suggestions.length > 0 && (
+                        <div style={{ position: 'absolute', top: '110%', left: 0, width: '240px', backgroundColor: '#1e293b', color: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 50 }}>
+                            {suggestions.map((s, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => handleSelectCity(s.name)}
+                                    style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: idx !== suggestions.length - 1 ? '1px solid #334155' : 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}
+                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#334155'}
+                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <span style={{ fontWeight: '600', fontSize: '14px' }}>{s.name}</span>
+                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{s.admin1 ? `${s.admin1}, ` : ''}{s.country_code}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <button style={{ padding: '8px 20px', borderRadius: '20px', border: 'none', backgroundColor: '#0284c7', color: 'white', fontWeight: '600', cursor: 'pointer' }}>Login</button>
                 </div>
             </header>
 
-            {/* 2. MAIN CONTENT AREA (NOW FULL-SCREEN IMAGE BACKGROUND!) */}
-            {/* 2. MAIN CONTENT AREA (NOW FULL-SCREEN IMAGE BACKGROUND!) */}
-            <main style={{
+            {/* ANA İÇERİK BÖLÜMÜ (ARKA PLAN) */}
+            <div style={{
                 flex: 1,
-                // Mixing a gentle dark linear overlay with the dynamic background image for premium contrast balance
-                // Cross-browser bulletproof background shorthand
                 background: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.35)), ${dynamicBackgroundImage} center/cover no-repeat`,
-                width: '100%', // <-- EKLENDİ: Genişliği %100 yap
+                width: '100%',
                 padding: '40px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '25px',
-                boxSizing: 'border-box', // <-- EKLENDİ: Taşmaları önle
-                transition: 'background 0.6s ease-in-out' // Smooth transitions between weather photos
+                boxSizing: 'border-box',
+                transition: 'background 0.6s ease-in-out'
             }}>
 
-                {/* Validation Error Banner */}
                 {validationError && (
-                    <div style={{
-                        color: '#856404',
-                        backgroundColor: '#fff3cd',
-                        border: '1px solid #ffeeba',
-                        padding: '12px 20px',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        fontWeight: '500'
-                    }}>
-                        ⚠️ {validationError}
-                    </div>
+                    <div style={{ color: '#856404', backgroundColor: '#fff3cd', border: '1px solid #ffeeba', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '500', marginBottom: '20px' }}>⚠️ {validationError}</div>
                 )}
 
-                {/* API-level Response Network Errors */}
                 {error && !validationError && (
-                    <div style={{
-                        color: '#721c24',
-                        backgroundColor: '#f8d7da',
-                        border: '1px solid #f5c6cb',
-                        padding: '12px 20px',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        fontWeight: '500'
-                    }}>
-                        ❌ {error}
-                    </div>
+                    <div style={{ color: '#721c24', backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '500', marginBottom: '20px' }}>❌ {error}</div>
                 )}
 
                 {loading && (
-                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px', fontWeight: '500' }}>
-                        Syncing live satellite coordinates...
-                    </div>
+                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px', fontWeight: '500' }}>Syncing live satellite coordinates...</div>
                 )}
 
                 {weatherData && !loading && (
                     <>
-                        {/* CITY & DATE INFO */}
-                        <div style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}>
-                            <h2 style={{ margin: '0 0 5px 0', fontSize: '36px', fontWeight: '600' }}>{weatherData.cityName}</h2>
-                            <p style={{ margin: 0, opacity: 0.9, fontSize: '15px' }}>{weatherData.dateStr}</p>
-                        </div>
+                        {/* --- DIŞ KAPSAYICI (Genişliği 1400'den 1650'ye çıkardık ki sağa yayılsın) --- */}
+                        <div style={{ maxWidth: '1650px', margin: '0 auto', width: '100%', padding: '0 20px' }}>
 
-                        {/* DASHBOARD GRID CONTAINER */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 2fr',
-                            gap: '30px',
-                            alignItems: 'start'
-                        }}>
+                            {/* Şehir ve Tarih Başlığı (Aynı kalıyor) */}
+                            <div style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.4)', marginBottom: '30px' }}>
+                                <h2 style={{ margin: '0 0 5px 0', fontSize: '42px', fontWeight: '700' }}>{weatherData.cityName}</h2>
+                                <p style={{ margin: 0, opacity: 0.9, fontSize: '18px' }}>{weatherData.dateStr}</p>
+                            </div>
 
-                            {/* LEFT COLUMN: CURRENT WEATHER CARD */}
-                            <div style={{
-                                background: 'rgba(0, 0, 0, 0.45)',
-                                backdropFilter: 'blur(16px)',
-                                borderRadius: '24px',
-                                padding: '40px 30px',
-                                color: 'white',
-                                border: '1px solid rgba(255,255,255,0.25)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+                            {/* ESKİZDEKİ ASİMETRİK GRID SİSTEMİ */}
+                            <main style={{
+                                display: 'grid',
+                                // KİLİT NOKTA: Sol tarafı 420px'e çiviledik (asla bozulmaz), sağ taraf ise '1fr' ile kalan tüm alanı yutarak sağa uzar!
+                                gridTemplateColumns: '420px 1fr',
+                                gap: '40px',
+                                alignItems: 'start'
                             }}>
-                                <div style={{ fontSize: '110px', lineHeight: 1, margin: '10px 0', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>
-                                    {getWeatherIcon(weatherData.condition)}
-                                </div>
-                                <div style={{ fontSize: '72px', fontWeight: '700', margin: '10px 0', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
-                                    {formatTemperature(weatherData.temp)}
-                                </div>
-                                <div style={{ fontSize: '18px', opacity: 0.9, marginBottom: '30px', fontWeight: '500' }}>
-                                    Feeling like {formatTemperature(weatherData.feelsLike)}
-                                </div>
 
-                                {/* WEATHER DETAILS LIST */}
+                                {/* SOL KOLON: ANA HAVA DURUMU KARTI ... (Buradan aşağısı tamamen aynı kalacak) */}
+
+                                {/* SOL KOLON: ANA HAVA DURUMU KARTI */}
                                 <div style={{
-                                    width: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '15px',
-                                    borderTop: '1px solid rgba(255,255,255,0.2)',
-                                    paddingTop: '25px'
+                                    background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '30px', padding: '50px 40px', color: 'white', border: '1px solid rgba(255,255,255,0.25)', boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
                                 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
-                                        <span>💨 WIND</span>
-                                        <span style={{ fontWeight: '600' }}>{weatherData.wind}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
-                                        <span>💧 HUMIDITY</span>
-                                        <span style={{ fontWeight: '600' }}>{weatherData.humidity}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
-                                        <span>🌡️ DEW POINT</span>
-                                        <span style={{ fontWeight: '600' }}>{weatherData.dewPoint}</span>
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px' }}>
-                                        <span>⏲️ PRESSURE</span>
-                                        <span style={{ fontWeight: '600' }}>{weatherData.pressure}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* RIGHT COLUMN: FORECAST & RADAR MAP */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-
-                                {/* 7-DAY FORECAST ROW */}
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(7, 1fr)',
-                                    gap: '12px'
-                                }}>
-                                    {weatherData.forecast.map((f, i) => (
-                                        <div key={i} style={{
-                                            background: 'rgba(0, 0, 0, 0.45)', // <-- Tüm kartlar için aynı koyu cam efekti
-                                            backdropFilter: 'blur(16px)',
-                                            color: 'white', // <-- Tüm metinler beyaz
-                                            borderRadius: '16px',
-                                            padding: '15px 10px',
-                                            textAlign: 'center',
-                                            border: '1px solid rgba(255,255,255,0.2)',
-                                            boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
-                                        }}>
-                                            <div style={{ fontWeight: '700', fontSize: '14px' }}>{f.day}</div>
-                                            <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: '8px' }}>({f.date})</div>
-                                            <div style={{ fontSize: '32px', margin: '8px 0' }}>{getWeatherIcon(f.condition)}</div>
-                                            <div style={{ fontWeight: '700', fontSize: '15px' }}>{formatTemperature(f.maxTemp)}/{formatTemperature(f.minTemp)}</div>
-                                            <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '5px', fontWeight: '500' }}>{f.condition}</div>
+                                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                                        {/* Gece/Gündüz kontrolü ve Hilal ikonu */}
+                                        {/* YENİ: weatherData.isNight kontrolü eklendi. weathermap api verisinde sys.pod = 'n' ise */}
+                                        <div className="animated-weather-icon" style={{ fontSize: '130px', lineHeight: 1, filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.3))' }}>
+                                            {getWeatherIcon(weatherData.condition, weatherData.isNight)}
                                         </div>
-                                    ))}
+
+                                        <div style={{ fontSize: '90px', fontWeight: '700', margin: '15px 0', textShadow: '0 4px 8px rgba(0,0,0,0.3)' }}>{formatTemperature(weatherData.temp)}</div>
+                                        <div style={{ fontSize: '22px', opacity: 0.9, fontWeight: '500' }}>Feeling like {formatTemperature(weatherData.feelsLike)}</div>
+                                    </div>
+
+                                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '25px', borderTop: '2px solid rgba(255,255,255,0.15)', paddingTop: '30px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>💨 WIND</span><span style={{ fontWeight: '700' }}>{weatherData.wind}</span></div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>💧 HUMIDITY</span><span style={{ fontWeight: '700' }}>{weatherData.humidity}</span></div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>🌡️ DEW POINT</span><span style={{ fontWeight: '700' }}>{weatherData.dewPoint}</span></div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>⏲️ PRESSURE</span><span style={{ fontWeight: '700' }}>{weatherData.pressure}</span></div>
+                                    </div>
                                 </div>
 
-                                {/* RADAR & SATELLITE BOX */}
-                                <div style={{
-                                    background: 'rgba(0, 0, 0, 0.45)',
-                                    backdropFilter: 'blur(16px)',
-                                    borderRadius: '24px',
-                                    padding: '25px',
-                                    border: '1px solid rgba(255,255,255,0.25)',
-                                    boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'white' }}>
-                                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Local Radar & Satellite</h3>
-                                        <div style={{ display: 'flex', gap: '10px' }}>
-                                            <span style={{ padding: '5px 12px', background: '#0284c7', borderRadius: '12px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Air Pressure</span>
-                                            <span style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.25)', borderRadius: '12px', fontSize: '12px', cursor: 'pointer' }}>Satellite</span>
+                                {/* SAĞ KOLON: 7-DAY -> HOURLY -> RADAR */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+
+                                    {/* 1. DAILY FORECAST */}
+                                    <div style={{ background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', padding: '25px', border: '1px solid rgba(255,255,255,0.25)' }}>
+                                        <h3 style={{ color: 'white', margin: '0 0 15px 0', fontSize: '18px', fontWeight: '600' }}>📅 Daily Forecast</h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                                            {weatherData.forecast.map((f, i) => (
+                                                <div key={i} style={{ flex: 1, color: 'white', textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: '12px 5px', borderRadius: '16px' }}>
+                                                    <div style={{ fontWeight: '700', fontSize: '14px' }}>{f.day}</div>
+                                                    <div style={{ fontSize: '28px', margin: '10px 0' }}>{getWeatherIcon(f.condition)}</div>
+                                                    <div style={{ fontWeight: '700', fontSize: '16px' }}>{formatTemperature(f.maxTemp)}</div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
 
-                                    {/* LIVE INTERACTIVE RADAR MAP */}
-                                    <div style={{
-                                        height: '240px',
-                                        borderRadius: '16px',
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
-                                    }}>
-                                        <iframe
-                                            width="100%"
-                                            height="100%"
-                                            src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=${weatherData.lat}&lon=${weatherData.lon}`}
-                                            frameBorder="0"
-                                            title="Live Weather Radar"
-                                        ></iframe>
+                                    {/* 2. HOURLY FORECAST */}
+                                    <div style={{ background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', padding: '25px', border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
+                                        <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: '600' }}>🕒 Hourly Forecast</h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            {weatherData.hourly.map((h, i) => (
+                                                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600', textTransform: 'uppercase' }}>{h.day}</span>
+                                                    <span style={{ fontSize: '15px', fontWeight: '500' }}>{h.time}</span>
+                                                    <span style={{ fontSize: '28px' }}>{getWeatherIcon(h.condition, h.time !== 'Now' && (parseInt(h.time) >= 19 || parseInt(h.time) <= 5))}</span>
+                                                    <span style={{ fontSize: '18px', fontWeight: '700' }}>{formatTemperature(h.temp)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
 
-                            </div>
+                                    {/* 3. LOCAL RADAR & SATELLITE */}
+                                    <div style={{ background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', padding: '25px', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'white' }}>
+                                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>📡 Local Radar & Satellite</h3>
+                                        </div>
+                                        <div style={{ height: '380px', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
+                                            <iframe width="100%" height="100%" src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=${weatherData.lat}&lon=${weatherData.lon}`} frameBorder="0" title="Live Weather Radar"></iframe>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </main>
                         </div>
+                        {/* --- BURAYA KADAR KOPYALA --- */}
                     </>
                 )}
-            </main>
+            </div>
 
-            {/* 4. FOOTER SECTION */}
-            <footer style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '15px 40px',
-                backgroundColor: '#ffffff',
-                color: '#64748b',
-                fontSize: '13px',
-                borderTop: '1px solid #e2e8f0'
-            }}>
+            {/* FOOTER BÖLÜMÜ */}
+            <footer style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 40px', backgroundColor: '#ffffff', color: '#64748b', fontSize: '13px', borderTop: '1px solid #e2e8f0' }}>
                 <span>© 2026 SkyLine Weather Hub. All rights reserved.</span>
                 <div style={{ display: 'flex', gap: '20px' }}>
                     <span style={{ cursor: 'pointer' }}>Privacy Policy</span>

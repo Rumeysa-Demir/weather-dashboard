@@ -71,6 +71,51 @@ export const useWeather = (city) => {
                 const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true };
                 const formattedDate = new Date().toLocaleDateString('en-US', options);
 
+                // YENÝ EKLENEN KISIM: 1. Eleman olarak "ÞU AN" (Now) verisini manuel oluþturuyoruz
+                const now = new Date();
+                const currentDay = now.toLocaleDateString('en-US', { weekday: 'short' });
+
+                const nowItem = {
+                    time: 'Now',
+                    day: currentDay,
+                    temp: currentData.main.temp,
+                    condition: currentData.weather[0].main
+                };
+
+                // Diðer 5 eleman: API'den gelen GELECEK saatlerin tahmini
+                const futureItems = forecastData.list.slice(0, 5).map(item => {
+                    const date = new Date(item.dt * 1000);
+                    const hours = date.getHours().toString().padStart(2, '0');
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+
+                    return {
+                        time: `${hours}:00`,
+                        day: dayName,
+                        temp: item.main.temp,
+                        condition: item.weather[0].main
+                    };
+                });
+
+                // "Þimdi" verisini en baþa koyup, arkasýna gelecek tahminlerini ekliyoruz
+                const hourlyForecast = [nowItem, ...futureItems];
+
+                // Map everything beautifully to match our dashboard state
+                setWeatherData({
+                    cityName: `${currentData.name}, ${currentData.sys.country}`,
+                    dateStr: `${formattedDate} GMT+3`,
+                    temp: currentData.main.temp,
+                    feelsLike: currentData.main.feels_like,
+                    condition: currentData.weather[0].main,
+                    wind: `${currentData.wind.speed} km/h`,
+                    humidity: `${currentData.main.humidity}%`,
+                    dewPoint: `${Math.round(currentData.main.temp - ((100 - currentData.main.humidity) / 5))}°C`,
+                    pressure: `${currentData.main.pressure} hPa`,
+                    forecast: formattedForecast,
+                    hourly: hourlyForecast, // <-- Güncellenmiþ mantýklý listeyi arayüze gönderiyoruz
+                    lat: lat,
+                    lon: lon
+                });
+                
                 // Map everything beautifully to match our dashboard state
                 setWeatherData({
                     cityName: `${currentData.name}, ${currentData.sys.country}`,
@@ -83,8 +128,9 @@ export const useWeather = (city) => {
                     dewPoint: `${Math.round(currentData.main.temp - ((100 - currentData.main.humidity) / 5))}°C`, // Standard scientific approximation
                     pressure: `${currentData.main.pressure} hPa`,
                     forecast: formattedForecast,
-                    lat: lat, // <-- EKLENDÝ: Harita için Enlem
-                    lon: lon  // <-- EKLENDÝ: Harita için Boylam
+                    hourly: hourlyForecast,
+                    lat: lat, 
+                    lon: lon 
                 });
 
             } catch (err) {
