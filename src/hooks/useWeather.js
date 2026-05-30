@@ -83,14 +83,22 @@ export const useWeather = (city) => {
                 };
 
                 // Diðer 5 eleman: API'den gelen GELECEK saatlerin tahmini
-                const futureItems = forecastData.list.slice(0, 5).map(item => {
-                    const date = new Date(item.dt * 1000);
-                    const hours = date.getHours().toString().padStart(2, '0');
-                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                // 1. Þehrin UTC'ye göre saniye farkýný alýyoruz
+                const timezoneOffset = currentData.timezone;
+
+                // 2. Gelecek saatleri hesaplarken þehrin kendi saat dilimini (timezone) ekliyoruz
+                const futureItems = forecastData.list.slice(0, 5).map((item) => {
+                    // SÝHÝRLÝ FORMÜL: Evrensel saate (dt) þehrin kendi saat farkýný ekle
+                    const localTime = new Date((item.dt + timezoneOffset) * 1000);
+
+                    // getHours yerine getUTCHours kullanýyoruz çünkü farký üstte biz manuel ekledik!
+                    const hours = localTime.getUTCHours().toString().padStart(2, '0');
+                    const minutes = localTime.getUTCMinutes().toString().padStart(2, '0');
+                    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
                     return {
-                        time: `${hours}:00`,
-                        day: dayName,
+                        time: `${hours}:${minutes}`,
+                        day: days[localTime.getUTCDay()],
                         temp: item.main.temp,
                         condition: item.weather[0].main
                     };
@@ -99,10 +107,10 @@ export const useWeather = (city) => {
                 // "Þimdi" verisini en baþa koyup, arkasýna gelecek tahminlerini ekliyoruz
                 const hourlyForecast = [nowItem, ...futureItems];
 
-                // Map everything beautifully to match our dashboard state
                 setWeatherData({
                     cityName: `${currentData.name}, ${currentData.sys.country}`,
-                    dateStr: `${formattedDate} GMT+3`,
+                    // "GMT+3" sabit yazýsýný kaldýrdýk, sadece formatlý tarih görünecek
+                    dateStr: formattedDate,
                     temp: currentData.main.temp,
                     feelsLike: currentData.main.feels_like,
                     condition: currentData.weather[0].main,
@@ -111,26 +119,11 @@ export const useWeather = (city) => {
                     dewPoint: `${Math.round(currentData.main.temp - ((100 - currentData.main.humidity) / 5))}°C`,
                     pressure: `${currentData.main.pressure} hPa`,
                     forecast: formattedForecast,
-                    hourly: hourlyForecast, // <-- Güncellenmiþ mantýklý listeyi arayüze gönderiyoruz
-                    lat: lat,
-                    lon: lon
-                });
-                
-                // Map everything beautifully to match our dashboard state
-                setWeatherData({
-                    cityName: `${currentData.name}, ${currentData.sys.country}`,
-                    dateStr: `${formattedDate} GMT+3`,
-                    temp: currentData.main.temp,
-                    feelsLike: currentData.main.feels_like,
-                    condition: currentData.weather[0].main,
-                    wind: `${currentData.wind.speed} km/h`,
-                    humidity: `${currentData.main.humidity}%`,
-                    dewPoint: `${Math.round(currentData.main.temp - ((100 - currentData.main.humidity) / 5))}°C`, // Standard scientific approximation
-                    pressure: `${currentData.main.pressure} hPa`,
-                    forecast: formattedForecast,
                     hourly: hourlyForecast,
-                    lat: lat, 
-                    lon: lon 
+                    lat: lat,
+                    lon: lon,
+                    // GECE/GÜNDÜZ KONTROLÜ (Bunu eklemeyi unutma!)
+                    isNight: currentData.weather[0].icon.includes('n')
                 });
 
             } catch (err) {
