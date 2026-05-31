@@ -1,45 +1,636 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useWeather } from './hooks/useWeather';
 import { formatTemperature, getWeatherIcon, getWeatherBackground } from './utils/weatherUtils';
 
+/* ─────────────────────────────────────────────
+   CSS Variables injected once via a <style> tag
+   ───────────────────────────────────────────── */
+const GlobalStyles = () => (
+    <style>{`
+    /* ── Design Tokens ── */
+    :root {
+      --clr-brand:        #0ea5e9;
+      --clr-brand-dark:   #0284c7;
+      --clr-brand-light:  #e0f2fe;
+      --clr-surface:      #ffffff;
+      --clr-bg:           #f0f9ff;
+      --clr-text:         #0f172a;
+      --clr-text-muted:   #64748b;
+      --clr-border:       #cbd5e1;
+      --clr-danger:       #ef4444;
+      --clr-danger-dark:  #dc2626;
+      --clr-warn-bg:      #fff3cd;
+      --clr-warn-border:  #ffeeba;
+      --clr-warn-text:    #856404;
+      --clr-error-bg:     #fef2f2;
+      --clr-error-border: #f87171;
+      --clr-error-text:   #ef4444;
+      --clr-dark:         #1e293b;
+      --clr-overlay:      rgba(0,0,0,0.45);
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --radius-xl: 30px;
+
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 20px rgba(0,0,0,0.10);
+      --shadow-lg: 0 20px 40px rgba(0,0,0,0.18);
+
+      --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --transition: 0.2s ease;
+    }
+
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--clr-bg);
+      color: var(--clr-text);
+      min-height: 100vh;
+    }
+
+    /* ── Focus ring for keyboard navigation ── */
+    :focus-visible {
+      outline: 3px solid var(--clr-brand);
+      outline-offset: 2px;
+    }
+
+    /* ── Skip link ── */
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 1rem;
+      background: var(--clr-brand);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      z-index: 9999;
+      transition: top var(--transition);
+    }
+    .skip-link:focus { top: 1rem; }
+
+    /* ── Header ── */
+    .site-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      height: 72px;
+      padding: 0 2rem;
+      background-color: var(--clr-surface);
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      z-index: 100;
+    }
+    .header-logo { display: flex; align-items: center; flex-shrink: 0; cursor: pointer; }
+    .header-logo img { height: 50px; width: auto; object-fit: contain; display: block; }
+
+    /* Header center buttons */
+    .header-actions {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      flex-shrink: 0;
+    }
+
+    /* Login button — slightly taller than regular btns for visual weight */
+    .btn-login {
+      background: linear-gradient(135deg, var(--clr-brand), var(--clr-brand-dark));
+      color: white;
+      border: none;
+      padding: 0.6875rem 1.5rem;
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 0.9375rem;
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      height: 44px;
+      box-shadow: 0 2px 8px rgba(14,165,233,0.35);
+      transition: box-shadow var(--transition), transform var(--transition), background var(--transition);
+    }
+    .btn-login:hover {
+      box-shadow: 0 4px 16px rgba(14,165,233,0.5);
+      transform: translateY(-1px);
+    }
+    .btn-login:active { transform: translateY(0); }
+    .btn-login:focus-visible { outline: 3px solid var(--clr-brand); outline-offset: 2px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5625rem 1.125rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border: none;
+      white-space: nowrap;
+      line-height: 1;
+      transition: background-color var(--transition), color var(--transition), border-color var(--transition);
+    }
+    .btn:focus-visible { outline: 3px solid var(--clr-brand); outline-offset: 2px; }
+    .btn-primary { background: var(--clr-brand); color: white; }
+    .btn-primary:hover, .btn-primary:focus-visible { background: var(--clr-brand-dark); }
+    .btn-outline { background: white; color: var(--clr-brand); border: 1.5px solid var(--clr-brand); }
+    .btn-outline:hover { background: var(--clr-brand-light); }
+    .btn-dark { background: var(--clr-dark); color: white; text-decoration: none; }
+    .btn-dark:hover { background: #0f172a; }
+    .btn-ghost { background: var(--clr-bg); color: var(--clr-dark); border: 1.5px solid var(--clr-border); }
+    .btn-ghost:hover { background: #e2e8f0; }
+    .btn-danger { background: var(--clr-danger); color: white; width: 100%; justify-content: center; padding: 0.75rem; font-size: 0.875rem; border-radius: var(--radius-md); }
+    .btn-danger:hover { background: var(--clr-danger-dark); }
+    .btn-fixed-w { width: 7.5rem; justify-content: center; }
+
+    /* ── Search box ── */
+    .search-wrapper { position: relative; }
+    .search-form {
+      display: flex;
+      align-items: center;
+      background: var(--clr-bg);
+      border: 1.5px solid var(--clr-border);
+      border-radius: var(--radius-md);
+      padding: 0 0.75rem;
+      gap: 0.5rem;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      height: 44px;
+    }
+    .search-form:focus-within {
+      border-color: var(--clr-brand);
+      box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+      background: var(--clr-surface);
+    }
+    .search-icon {
+      color: var(--clr-text-muted);
+      font-size: 1rem;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .search-input {
+      border: none;
+      background: transparent;
+      font-size: 0.9375rem;
+      width: 200px;
+      line-height: 1;
+      color: var(--clr-text);
+      padding: 0;
+    }
+    .search-input:focus { outline: none; }
+    .search-input::placeholder { color: #94a3b8; }
+
+    /* Autocomplete dropdown */
+    .autocomplete {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: 280px;
+      background: var(--clr-dark);
+      color: white;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      z-index: 200;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .autocomplete-item {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: background var(--transition);
+    }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover, .autocomplete-item:focus { background: #334155; outline: none; }
+    .autocomplete-icon { font-size: 1.125rem; flex-shrink: 0; }
+    .autocomplete-text { display: flex; flex-direction: column; gap: 0.125rem; }
+    .autocomplete-city { font-weight: 600; font-size: 0.9375rem; }
+    .autocomplete-region { font-size: 0.75rem; color: #94a3b8; }
+
+    /* ── User menu ── */
+    .user-menu-wrapper { position: relative; }
+    .user-menu-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      background: rgba(15,23,42,0.94);
+      backdrop-filter: blur(20px);
+      border-radius: var(--radius-lg);
+      padding: 1.375rem;
+      width: 300px;
+      border: 1px solid rgba(255,255,255,0.12);
+      z-index: 200;
+      color: white;
+      box-shadow: 0 20px 40px -10px rgba(0,0,0,0.5);
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .user-menu-section { margin-bottom: 1.25rem; }
+    .user-menu-section h3 {
+      margin: 0 0 0.75rem;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: #94a3b8;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 0.5rem;
+    }
+    .user-menu-section ul { list-style: none; }
+    .user-menu-section li {
+      padding: 0.625rem 0.75rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: background var(--transition);
+      margin-bottom: 0.25rem;
+    }
+    .user-menu-section li:hover { background: rgba(255,255,255,0.07); }
+    .user-menu-empty { opacity: 0.45; font-size: 0.875rem; padding: 0.5rem 0; }
+
+    /* ── Alert banners ── */
+    .alert {
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 1.25rem;
+      role: alert;
+    }
+    .alert-warn { color: var(--clr-warn-text); background: var(--clr-warn-bg); border: 1px solid var(--clr-warn-border); }
+    .alert-error { color: var(--clr-error-text); background: var(--clr-error-bg); border: 1px solid var(--clr-error-border); }
+
+    /* ── Main content area ── */
+    .site-main {
+      flex: 1;
+      width: 100%;
+      padding: 2.5rem;
+      transition: background 0.6s ease-in-out;
+    }
+    .content-inner { max-width: 1650px; margin: 0 auto; width: 100%; }
+
+    /* City heading row */
+    .city-heading {
+      color: white;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+      margin-bottom: 1.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.9375rem;
+    }
+    .city-heading h1 { font-size: 2.625rem; font-weight: 700; margin-bottom: 0.3125rem; }
+    .city-heading p { opacity: 0.9; font-size: 1.125rem; }
+    .fav-btn {
+      background: transparent;
+      border: none;
+      font-size: 2rem;
+      cursor: pointer;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+      transition: transform var(--transition);
+      padding: 0.25rem;
+      border-radius: 50%;
+    }
+    .fav-btn:hover { transform: scale(1.2); }
+    .fav-btn:focus-visible { outline: 3px solid var(--clr-brand); }
+
+    /* ── Weather grid ── */
+    .weather-grid {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 2.5rem;
+      align-items: start;
+    }
+    .weather-right { display: flex; flex-direction: column; gap: 1.5625rem; }
+
+    /* Glass cards */
+    .glass-card {
+      background: var(--clr-overlay);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius-xl);
+      padding: 3.125rem 2.5rem;
+      color: white;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .glass-panel {
+      background: var(--clr-overlay);
+      backdrop-filter: blur(16px);
+      border-radius: 1.5rem;
+      padding: 1.5625rem;
+      border: 1px solid rgba(255,255,255,0.25);
+      color: white;
+    }
+    .glass-panel h2 { margin: 0 0 0.9375rem; font-size: 1.125rem; font-weight: 600; }
+
+    /* Main weather card internals */
+    .weather-icon-area { text-align: center; margin-bottom: 2.5rem; }
+    .weather-icon { font-size: 8.125rem; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3)); }
+    .weather-temp { font-size: 5.625rem; font-weight: 700; margin: 0.9375rem 0; text-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+    .weather-feels { font-size: 1.375rem; opacity: 0.9; font-weight: 500; }
+    .weather-stats { width: 100%; display: flex; flex-direction: column; gap: 1.5625rem; border-top: 2px solid rgba(255,255,255,0.15); padding-top: 1.875rem; }
+    .weather-stat { display: flex; justify-content: space-between; font-size: 1.125rem; }
+    .weather-stat span:last-child { font-weight: 700; }
+
+    /* Forecast rows */
+    .daily-grid { display: flex; justify-content: space-between; gap: 0.75rem; }
+    .daily-item {
+      flex: 1;
+      color: white;
+      text-align: center;
+      background: rgba(255,255,255,0.1);
+      padding: 0.75rem 0.3125rem;
+      border-radius: 1rem;
+    }
+    .daily-day { font-weight: 700; font-size: 0.875rem; }
+    .daily-icon { font-size: 1.75rem; margin: 0.625rem 0; }
+    .daily-temp { font-weight: 700; font-size: 1rem; }
+
+    .hourly-row { display: flex; justify-content: space-between; align-items: center; }
+    .hourly-item { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .hourly-label { font-size: 0.75rem; color: #cbd5e1; font-weight: 600; text-transform: uppercase; }
+    .hourly-time { font-size: 0.9375rem; font-weight: 500; }
+    .hourly-icon { font-size: 1.75rem; }
+    .hourly-temp { font-size: 1.125rem; font-weight: 700; }
+
+    /* Radar */
+    .radar-frame { height: 380px; border-radius: 1rem; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .radar-frame iframe { width: 100%; height: 100%; border: none; display: block; }
+
+    /* ── Loading ── */
+    .loading-text { color: white; font-size: 1.25rem; text-align: center; margin-top: 3.125rem; font-weight: 500; }
+
+    /* ── Footer ── */
+    .site-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.9375rem 2.5rem;
+      background-color: var(--clr-surface);
+      color: var(--clr-text-muted);
+      font-size: 0.8125rem;
+      border-top: 1px solid #e2e8f0;
+    }
+    .footer-links { display: flex; gap: 1.25rem; }
+    .footer-links a { color: var(--clr-text-muted); text-decoration: none; cursor: pointer; transition: color var(--transition); }
+    .footer-links a:hover { color: var(--clr-brand); }
+
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(5px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-box {
+      background: var(--clr-surface);
+      padding: 2.5rem;
+      border-radius: 1.5rem;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+    .modal-title { margin: 0 0 1.5625rem; color: var(--clr-dark); text-align: center; font-size: 1.75rem; }
+    .modal-title span { color: var(--clr-brand); }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    .form-label { font-size: 0.875rem; color: var(--clr-text-muted); font-weight: 600; margin-left: 0.3125rem; }
+    .form-input {
+      padding: 0.875rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--clr-border);
+      font-size: 1rem;
+      background: #f8fafc;
+      color: var(--clr-text);
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .form-input:focus { border-color: var(--clr-brand); box-shadow: 0 0 0 3px rgba(14,165,233,0.15); outline: none; }
+    .login-form-fields { display: flex; flex-direction: column; gap: 1.25rem; }
+    .login-form-actions { display: flex; flex-direction: column; gap: 0.625rem; margin-top: 0.625rem; }
+    .btn-cancel { background: transparent; color: #94a3b8; border: none; padding: 0.625rem; cursor: pointer; font-weight: 600; font-size: 0.875rem; border-radius: var(--radius-sm); transition: color var(--transition); }
+    .btn-cancel:hover { color: var(--clr-text-muted); }
+
+    /* ─────────────── RESPONSIVE ─────────────── */
+    /* Tablet: ≤ 1024px */
+    @media (max-width: 1024px) {
+      .weather-grid { grid-template-columns: 1fr; }
+      .header-actions { display: none; }  /* hide center actions, use mobile nav instead */
+    }
+
+    /* Mobile: ≤ 768px */
+    @media (max-width: 768px) {
+      .site-header {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 0.75rem 1rem;
+        gap: 0.625rem;
+      }
+      .header-right { width: 100%; justify-content: flex-end; }
+      .search-input { width: 140px; }
+
+      .site-main { padding: 1.25rem 1rem; }
+
+      .mobile-actions {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .mobile-actions .btn { font-size: 0.8125rem; padding: 0.5rem 0.75rem; }
+
+      .city-heading h1 { font-size: 1.75rem; }
+      .city-heading p { font-size: 1rem; }
+
+      .glass-card { padding: 1.5rem; border-radius: 1.25rem; }
+      .weather-icon { font-size: 5rem; }
+      .weather-temp { font-size: 3.5rem; }
+      .weather-feels { font-size: 1rem; }
+
+      .daily-grid { flex-wrap: wrap; }
+      .daily-item { min-width: 60px; }
+
+      .hourly-row { gap: 0.25rem; overflow-x: auto; padding-bottom: 0.5rem; }
+      .hourly-item { min-width: 60px; }
+
+      .radar-frame { height: 250px; }
+
+      .site-footer { flex-direction: column; gap: 0.5rem; text-align: center; }
+
+      .user-menu-dropdown { width: 260px; right: -0.5rem; }
+    }
+
+    /* Small phones: ≤ 480px */
+    @media (max-width: 480px) {
+      .search-input { width: 120px; font-size: 0.8125rem; }
+      .btn { padding: 0.5rem 0.625rem; font-size: 0.8125rem; }
+      .weather-grid { gap: 1rem; }
+      .glass-panel { padding: 1rem; }
+    }
+
+    /* Desktop-only: show center header actions */
+    @media (min-width: 1025px) {
+      .mobile-actions { display: none !important; }
+    }
+  `}</style>
+);
+
+/* ─────────────────────────────────────────────
+   Main App Component
+   ───────────────────────────────────────────── */
 function App() {
+    // ── STATE ──────────────────────────────────────────────────────────────────
     const [city, setCity] = useState('Mersin');
     const [searchInput, setSearchInput] = useState('');
     const [validationError, setValidationError] = useState('');
-    // Temel State'ler
-    const [user, setUser] = useState(JSON.parse(localStorage.getItem('weatherUser')) || null);
-    const [favorites, setFavorites] = useState(JSON.parse(localStorage.getItem('weatherFavorites')) || []);
-    const [recentSearches, setRecentSearches] = useState(JSON.parse(localStorage.getItem('weatherRecents')) || []);
+    const [isCelsius, setIsCelsius] = useState(true);
+    const [isLocating, setIsLocating] = useState(false);
 
-    // Login ve Hata Yönetimi State'leri
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    const [user, setUser] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('weatherUser')) || null; } catch { return null; }
+    });
+    const [favorites, setFavorites] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('weatherFavorites')) || []; } catch { return []; }
+    });
+    const [recentSearches, setRecentSearches] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('weatherRecents')) || []; } catch { return []; }
+    });
+
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [loginInput, setLoginInput] = useState('');
     const [passwordInput, setPasswordInput] = useState('');
     const [loginError, setLoginError] = useState('');
     const [showUserMenu, setShowUserMenu] = useState(false);
-    // --- KULLANICI İŞLEMLERİ ---
-    const handleLogin = (e) => {
-        e.preventDefault();
-        setLoginError(''); // Her denemede eski hatayı temizle
 
-        const userVal = loginInput.trim();
-        const passVal = passwordInput.trim();
+    const { weatherData, loading, error } = useWeather(city);
 
-        if (!userVal || !passVal) {
-            setLoginError('Please enter both username and password.');
+    // ── HELPERS ────────────────────────────────────────────────────────────────
+    const displayTemp = useCallback((celsiusValue) => {
+        if (isCelsius) return `${Math.round(celsiusValue)}°C`;
+        return `${Math.round((celsiusValue * 9 / 5) + 32)}°F`;
+    }, [isCelsius]);
+
+    const addToRecents = useCallback((cityName) => {
+        const newRecents = [cityName, ...recentSearches.filter(c => c !== cityName)].slice(0, 5);
+        setRecentSearches(newRecents);
+        try { localStorage.setItem('weatherRecents', JSON.stringify(newRecents)); } catch { }
+    }, [recentSearches]);
+
+    // Close dropdowns on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.user-menu-wrapper')) setShowUserMenu(false);
+            if (!e.target.closest('.search-wrapper')) setShowSuggestions(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // ── GEOLOCATION ────────────────────────────────────────────────────────────
+    const handleGeolocation = () => {
+        if (!navigator.geolocation) {
+            alert('Your browser does not support geolocation.');
             return;
         }
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            ({ coords: { latitude: lat, longitude: lon } }) => {
+                setCity({ lat, lon });
+                setSearchInput('');
+                setIsLocating(false);
+            },
+            () => {
+                alert('Could not get location. Please check your browser permissions.');
+                setIsLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
 
-        // HOCA İÇİN GİZLİ DEMO HESABI (Büyük/küçük harf duyarsız)
+    // ── SEARCH & AUTOCOMPLETE ──────────────────────────────────────────────────
+    useEffect(() => {
+        const trimmed = searchInput.trim();
+        if (trimmed.length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+        const timerId = setTimeout(async () => {
+            try {
+                const res = await fetch(
+                    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmed)}&count=5&language=en&format=json`
+                );
+                if (!res.ok) throw new Error('Search failed');
+                const data = await res.json();
+                setSuggestions(data.results || []);
+                setShowSuggestions((data.results || []).length > 0);
+            } catch (err) {
+                console.error('City search error:', err);
+                setSuggestions([]);
+            }
+        }, 300);
+        return () => clearTimeout(timerId);
+    }, [searchInput]);
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setValidationError('');
+        const cleanInput = searchInput.trim();
+        if (!cleanInput) { setValidationError('Please enter a valid city name.'); return; }
+        if (cleanInput.length < 2) { setValidationError('City name must be at least 2 characters long.'); return; }
+        setCity(cleanInput);
+        setSearchInput('');
+        setShowSuggestions(false);
+        addToRecents(cleanInput);
+    };
+
+    const handleSelectCity = (cityName) => {
+        setCity(cityName);
+        setSearchInput('');
+        setShowSuggestions(false);
+        setValidationError('');
+        addToRecents(cityName);
+    };
+
+    // Keyboard navigation for autocomplete
+    const handleSearchKeyDown = (e) => {
+        if (e.key === 'Escape') { setShowSuggestions(false); setSearchInput(''); }
+    };
+
+    // ── AUTH ───────────────────────────────────────────────────────────────────
+    const handleLogin = (e) => {
+        e.preventDefault();
+        setLoginError('');
+        const userVal = loginInput.trim();
+        const passVal = passwordInput.trim();
+        if (!userVal || !passVal) { setLoginError('Please enter both username and password.'); return; }
         if (userVal.toLowerCase() === 'rumeysa' && passVal === '123456') {
             const newUser = { name: 'Rumeysa' };
             setUser(newUser);
-            localStorage.setItem('weatherUser', JSON.stringify(newUser));
+            try { localStorage.setItem('weatherUser', JSON.stringify(newUser)); } catch { }
             setShowLoginModal(false);
             setLoginInput('');
             setPasswordInput('');
         } else {
-            // Şifre yanlışsa o profesyonel kırmızı hata mesajını ver!
             setLoginError('Invalid username or password. Please try again.');
         }
     };
@@ -47,482 +638,483 @@ function App() {
     const handleLogout = () => {
         setUser(null);
         setShowUserMenu(false);
-        localStorage.removeItem('weatherUser');
+        try { localStorage.removeItem('weatherUser'); } catch { }
     };
 
     const toggleFavorite = () => {
-        if (!user) {
-            alert('Favorilere eklemek için lütfen önce giriş yapın!');
-            return;
-        }
-        const city = weatherData.cityName;
-        let newFavs;
-        if (favorites.includes(city)) {
-            newFavs = favorites.filter(f => f !== city); // Varsa çıkar
-        } else {
-            newFavs = [...favorites, city]; // Yoksa ekle
-        }
+        if (!user) { alert('Please log in to add favorites!'); return; }
+        const currentCity = weatherData?.cityName;
+        if (!currentCity) return;
+        const newFavs = favorites.includes(currentCity)
+            ? favorites.filter(f => f !== currentCity)
+            : [...favorites, currentCity];
         setFavorites(newFavs);
-        localStorage.setItem('weatherFavorites', JSON.stringify(newFavs));
+        try { localStorage.setItem('weatherFavorites', JSON.stringify(newFavs)); } catch { }
     };
 
-    // BU FONKSİYONU ARAMA YAPTIĞIN YERE (Örn: handleSearch) EKLEMELİSİN
-    const addToRecents = (city) => {
-        // Aynı şehri tekrar eklememek ve son 5 aramayı tutmak için filtreleme yapıyoruz
-        const newRecents = [city, ...recentSearches.filter(c => c !== city)].slice(0, 5);
-        setRecentSearches(newRecents);
-        localStorage.setItem('weatherRecents', JSON.stringify(newRecents));
-    };
-
-    // Otomatik tamamlama (Autocomplete) State'leri
-    const [suggestions, setSuggestions] = useState([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-
-    const { weatherData, loading, error } = useWeather(city);
-
-    // Arama kutusuna yazı yazıldıkça Open-Meteo API'den canlı şehir tahminlerini çeker
-    useEffect(() => {
-        if (searchInput.trim().length < 2) {
-            setSuggestions([]);
-            setShowSuggestions(false);
-            return;
-        }
-
-        const fetchCities = async () => {
-            try {
-                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${searchInput}&count=5&language=en&format=json`);
-                const data = await res.json();
-
-                if (data.results) {
-                    setSuggestions(data.results);
-                } else {
-                    setSuggestions([]);
-                }
-                setShowSuggestions(true);
-            } catch (err) {
-                console.error("City search error:", err);
-            }
-        };
-
-        const timerId = setTimeout(() => {
-            fetchCities();
-        }, 300);
-
-        return () => clearTimeout(timerId);
-    }, [searchInput]);
-
-    const handleSelectCity = (cityName) => {
-        setCity(cityName);
-        setSearchInput('');
-        setShowSuggestions(false);
-        setValidationError('');
-
-        addToRecents(cityName);
-    };
-
-    const handleSearch = (e) => {
-        e.preventDefault();
-        setValidationError('');
-        const cleanInput = searchInput.trim();
-
-        if (!cleanInput) {
-            setValidationError('Please enter a valid city name.');
-            return;
-        }
-        if (cleanInput.length < 2) {
-            setValidationError('City name must be at least 2 characters long.');
-            return;
-        }
-
-        setCity(cleanInput);
-        setSearchInput('');
-        setShowSuggestions(false);
-
-        addToRecents(cleanInput);
-    };
-
-    const dynamicBackgroundImage = weatherData && !loading
+    const dynamicBg = weatherData && !loading
         ? getWeatherBackground(weatherData.condition)
         : getWeatherBackground('default');
 
+    // ── RENDER ─────────────────────────────────────────────────────────────────
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f5f7fb', fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif', margin: 0, padding: 0, boxSizing: 'border-box' }}>
-               
-               
+        <>
+            <GlobalStyles />
 
-                {/* HEADER BÖLÜMÜ ... */}
-            {/* HEADER BÖLÜMÜ */}
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 40px', backgroundColor: '#ffffff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', zIndex: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '28px' }}>☀️</span>
-                    <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#1e293b' }}>
-                        SkyLine <span style={{ color: '#0284c7' }}>Weather Hub</span>
-                    </h1>
-                </div>
+            {/* Skip navigation – accessibility */}
+            <a href="#main-content" className="skip-link">Skip to main content</a>
 
-                <nav style={{ display: 'flex', gap: '25px', fontWeight: '500', color: '#64748b' }}>
-                    <span style={{ color: '#0284c7', cursor: 'pointer', borderBottom: '2px solid #0284c7' }}>Home</span>
-                    <span style={{ cursor: 'pointer' }}>Forecast</span>
-                    <span style={{ cursor: 'pointer' }}>Radar</span>
-                    <span style={{ cursor: 'pointer' }}>Maps</span>
-                    <span style={{ cursor: 'pointer' }}>Contact</span>
-                </nav>
+            <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
 
-                {/* SEARCH & AUTOCOMPLETE */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
-                    <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center' }}>
-                        <input
-                            type="text"
-                            placeholder="Search city..."
-                            value={searchInput}
-                            onChange={(e) => setSearchInput(e.target.value)}
-                            style={{ padding: '8px 15px', borderRadius: '20px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '14px', width: '180px', transition: 'all 0.3s' }}
-                        />
-                    </form>
+                {/* ════════════════ HEADER ════════════════ */}
+                <header className="site-header" role="banner">
 
-                    {showSuggestions && suggestions.length > 0 && (
-                        <div style={{ position: 'absolute', top: '110%', left: 0, width: '240px', backgroundColor: '#1e293b', color: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', zIndex: 50 }}>
-                            {suggestions.map((s, idx) => (
-                                <div
-                                    key={idx}
-                                    onClick={() => handleSelectCity(s.name)}
-                                    style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: idx !== suggestions.length - 1 ? '1px solid #334155' : 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}
-                                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#334155'}
-                                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    {/* Logo */}
+                    <div
+                        className="header-logo"
+                        onClick={() => { setCity('Mersin'); setSearchInput(''); setValidationError(''); setShowSuggestions(false); }}
+                        role="link"
+                        tabIndex={0}
+                        aria-label="SkyLine Weather – go to homepage"
+                        onKeyDown={(e) => e.key === 'Enter' && setCity('Mersin')}
+                    >
+                        <img src="/logo.png" alt="SkyLine Weather logo" height="50" />
+                    </div>
+
+                    {/* Center buttons – hidden on mobile via CSS, shown inline on desktop */}
+                    <nav className="header-actions" aria-label="Main actions">
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleGeolocation}
+                            aria-label="Use my current location"
+                            aria-busy={isLocating}
+                            disabled={isLocating}
+                        >
+                            {isLocating ? '⏳ Locating…' : '📍 My Location'}
+                        </button>
+
+                        <button
+                            className="btn btn-outline btn-fixed-w"
+                            onClick={() => setIsCelsius(prev => !prev)}
+                            aria-label={`Switch to ${isCelsius ? 'Fahrenheit' : 'Celsius'}`}
+                        >
+                            {isCelsius ? '🌡️ °C → °F' : '🌡️ °F → °C'}
+                        </button>
+
+                        <a
+                            href="https://github.com/Rumeysa-Demir/weather-dashboard"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-dark"
+                            aria-label="View source code on GitHub (opens in new tab)"
+                        >
+                            ⭐ GitHub
+                        </a>
+                    </nav>
+
+                    {/* Right: search + login */}
+                    <div className="header-right">
+
+                        {/* Search */}
+                        <div className="search-wrapper" role="search">
+                            <form className="search-form" onSubmit={handleSearch} aria-label="City search">
+                                <label htmlFor="city-search" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+                                    Search for a city
+                                </label>
+                                <span className="search-icon" aria-hidden="true">🔍</span>
+                                <input
+                                    id="city-search"
+                                    type="search"
+                                    className="search-input"
+                                    placeholder="Search city…"
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    onKeyDown={handleSearchKeyDown}
+                                    autoComplete="off"
+                                    aria-autocomplete="list"
+                                    aria-controls={showSuggestions ? 'city-suggestions' : undefined}
+                                    aria-expanded={showSuggestions}
+                                />
+                            </form>
+
+                            {showSuggestions && suggestions.length > 0 && (
+                                <ul
+                                    id="city-suggestions"
+                                    className="autocomplete"
+                                    role="listbox"
+                                    aria-label="City suggestions"
                                 >
-                                    <span style={{ fontWeight: '600', fontSize: '14px' }}>{s.name}</span>
-                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{s.admin1 ? `${s.admin1}, ` : ''}{s.country_code}</span>
-                                </div>
-                            ))}
+                                    {suggestions.map((s, idx) => (
+                                        <li
+                                            key={idx}
+                                            className="autocomplete-item"
+                                            role="option"
+                                            tabIndex={0}
+                                            aria-selected={false}
+                                            onClick={() => handleSelectCity(s.name)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSelectCity(s.name)}
+                                        >
+                                            <span className="autocomplete-icon" aria-hidden="true">📍</span>
+                                            <span className="autocomplete-text">
+                                                <span className="autocomplete-city">{s.name}</span>
+                                                <span className="autocomplete-region">
+                                                    {s.admin1 ? `${s.admin1}, ` : ''}{s.country_code}
+                                                </span>
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
-                    )}
 
-                    {/* HEADER SAĞ KISIM: KULLANICI MENÜSÜ */}
-                    <div style={{ position: 'relative' }}>
-                        {!user ? (
-                            <button
-                                onClick={() => setShowLoginModal(true)}
-                                style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '8px 24px', borderRadius: '20px', cursor: 'pointer', fontWeight: '600' }}
-                            >
-                                Login
-                            </button>
-                        ) : (
-                            <div>
+                        {/* Auth */}
+                        <div className="user-menu-wrapper">
+                            {!user ? (
                                 <button
-                                    onClick={() => setShowUserMenu(!showUserMenu)}
-                                    style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                    className="btn-login"
+                                    onClick={() => setShowLoginModal(true)}
+                                    aria-haspopup="dialog"
                                 >
-                                    👤 {user.name}
+                                    🔐 Login
                                 </button>
+                            ) : (
+                                <>
+                                    <button
+                                        className="btn btn-ghost"
+                                        onClick={() => setShowUserMenu(prev => !prev)}
+                                        aria-haspopup="true"
+                                        aria-expanded={showUserMenu}
+                                        aria-label={`User menu for ${user.name}`}
+                                    >
+                                        👤 {user.name}
+                                    </button>
 
-                                {/* AÇILIR KULLANICI MENÜSÜ */}
-                                    {/* --- YENİ VE BÜYÜTÜLMÜŞ PROFESYONEL KULLANICI MENÜSÜ --- */}
                                     {showUserMenu && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: '100%',
-                                            right: 0,
-                                            marginTop: '15px',
-                                            background: 'rgba(0,0,0,0.85)', // Biraz daha koyu, daha okunabilir
-                                            backdropFilter: 'blur(20px)', // Daha yoğun bulanıklık efekti
-                                            borderRadius: '24px', // Daha yumuşak köşeler
-                                            padding: '25px', // Daha ferah iç boşluk
-                                            width: '350px', // Çok daha geniş bir menü
-                                            border: '1px solid rgba(255,255,255,0.15)', // Zarif, ince bir sınır
-                                            zIndex: 100,
-                                            color: 'white',
-                                            boxShadow: '0 20px 40px -10px rgba(0,0,0,0.6)', // Derinlik katan gölge
-                                            maxHeight: '450px', // Çok uzarsa ekranı kaplamasın
-                                            overflowY: 'auto' // Çok uzunsa kendi içinde aşağı kaysın
-                                        }}>
-
-                                            {/* FAVORİLER BÖLÜMÜ */}
-                                            <div style={{ marginBottom: '25px' }}>
-                                                <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: '700', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    ⭐ Favorites
-                                                </h4>
-                                                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                                                    {favorites.length === 0 ? (
-                                                        <li style={{ opacity: 0.5, fontSize: '16px', padding: '10px 0' }}>No favorites yet.</li>
-                                                    ) : favorites.map((fav, i) => (
-                                                        <li key={i} style={{
-                                                            padding: '12px 15px',
-                                                            fontSize: '16px',
-                                                            cursor: 'pointer',
-                                                            borderRadius: '12px',
-                                                            transition: 'background 0.2s',
-                                                            marginBottom: '5px'
-                                                        }}
-                                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                                            onClick={() => handleSearch(fav)} // Şehre tıklayınca hava durumunu aç!
-                                                        >
-                                                            🏙️ {fav}
-                                                        </li>
-                                                    ))}
+                                        <div
+                                            className="user-menu-dropdown"
+                                            role="menu"
+                                            aria-label="User menu"
+                                        >
+                                            {/* Favorites */}
+                                            <section className="user-menu-section" aria-labelledby="fav-heading">
+                                                <h3 id="fav-heading">⭐ Favorites</h3>
+                                                <ul>
+                                                    {favorites.length === 0
+                                                        ? <li className="user-menu-empty">No favorites yet.</li>
+                                                        : favorites.map((fav, i) => (
+                                                            <li
+                                                                key={i}
+                                                                role="menuitem"
+                                                                tabIndex={0}
+                                                                onClick={() => { setCity(fav); setShowUserMenu(false); }}
+                                                                onKeyDown={(e) => e.key === 'Enter' && setCity(fav)}
+                                                                aria-label={`Switch to ${fav}`}
+                                                            >
+                                                                🏙️ {fav}
+                                                            </li>
+                                                        ))
+                                                    }
                                                 </ul>
-                                            </div>
+                                            </section>
 
-                                            {/* SON ARAMALAR BÖLÜMÜ */}
-                                            <div style={{ marginBottom: '25px' }}>
-                                                <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: '700', color: '#cbd5e1', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    🕒 Recent Searches
-                                                </h4>
-                                                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                                                    {recentSearches.length === 0 ? (
-                                                        <li style={{ opacity: 0.5, fontSize: '16px', padding: '10px 0' }}>No recent searches.</li>
-                                                    ) : recentSearches.map((rec, i) => (
-                                                        <li key={i} style={{
-                                                            padding: '12px 15px',
-                                                            fontSize: '16px',
-                                                            cursor: 'pointer',
-                                                            borderRadius: '12px',
-                                                            transition: 'background 0.2s',
-                                                            marginBottom: '5px'
-                                                        }}
-                                                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                                                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                                            onClick={() => handleSearch(rec)} // Şehre tıklayınca hava durumunu aç!
-                                                        >
-                                                            🔍 {rec}
-                                                        </li>
-                                                    ))}
+                                            {/* Recent searches */}
+                                            <section className="user-menu-section" aria-labelledby="recent-heading">
+                                                <h3 id="recent-heading">🕒 Recent Searches</h3>
+                                                <ul>
+                                                    {recentSearches.length === 0
+                                                        ? <li className="user-menu-empty">No recent searches.</li>
+                                                        : recentSearches.map((rec, i) => (
+                                                            <li
+                                                                key={i}
+                                                                role="menuitem"
+                                                                tabIndex={0}
+                                                                onClick={() => { setCity(rec); setShowUserMenu(false); }}
+                                                                onKeyDown={(e) => e.key === 'Enter' && setCity(rec)}
+                                                                aria-label={`Search again for ${rec}`}
+                                                            >
+                                                                🔍 {rec}
+                                                            </li>
+                                                        ))
+                                                    }
                                                 </ul>
-                                            </div>
+                                            </section>
 
-                                            {/* LOGOUT BUTONU */}
-                                            <button
-                                                onClick={handleLogout}
-                                                style={{
-                                                    width: '100%',
-                                                    background: '#ef4444',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    padding: '14px',
-                                                    borderRadius: '14px',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '700',
-                                                    fontSize: '16px',
-                                                    transition: 'background 0.2s',
-                                                    marginTop: '10px'
-                                                }}
-                                                onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
-                                                onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
-                                            >
-                                                Logout
+                                            <button className="btn-danger btn" onClick={handleLogout} role="menuitem">
+                                                🚪 Logout
                                             </button>
                                         </div>
                                     )}
+                                </>
+                            )}
+                        </div>
+
+                    </div>
+                </header>
+                {/* ════════════════ HEADER END ════════════════ */}
+
+                {/* Mobile-only action bar (shown below 1024px) */}
+                <div className="mobile-actions" style={{ display: 'none', padding: '0.75rem 1rem', background: 'var(--clr-surface)', borderBottom: '1px solid var(--clr-border)' }} aria-label="Quick actions">
+                    <button className="btn btn-primary" onClick={handleGeolocation} aria-busy={isLocating} disabled={isLocating}>
+                        {isLocating ? '⏳' : '📍'} My Location
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setIsCelsius(prev => !prev)}>
+                        {isCelsius ? '°C→°F' : '°F→°C'}
+                    </button>
+                    <a href="https://github.com/Rumeysa-Demir/weather-dashboard" target="_blank" rel="noopener noreferrer" className="btn btn-dark">
+                        ⭐ GitHub
+                    </a>
+                </div>
+
+                {/* ════════════════ MAIN CONTENT ════════════════ */}
+                <main
+                    id="main-content"
+                    className="site-main"
+                    style={{
+                        flex: 1,
+                        background: `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.35)), ${dynamicBg} center/cover no-repeat`,
+                    }}
+                    aria-label="Weather information"
+                    aria-live="polite"
+                    aria-busy={loading}
+                >
+                    <div className="content-inner">
+
+                        {/* Validation error */}
+                        {validationError && (
+                            <div role="alert" aria-live="assertive" className="alert alert-warn">
+                                ⚠️ {validationError}
                             </div>
                         )}
-                    </div>
-                </div>
-            </header>
 
-            {/* ANA İÇERİK BÖLÜMÜ (ARKA PLAN) */}
-            <div style={{
-                flex: 1,
-                background: `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.35)), ${dynamicBackgroundImage} center/cover no-repeat`,
-                width: '100%',
-                padding: '40px',
-                boxSizing: 'border-box',
-                transition: 'background 0.6s ease-in-out'
-            }}>
+                        {/* API error */}
+                        {error && !validationError && (
+                            <div role="alert" aria-live="assertive" className="alert alert-error">
+                                ❌ {error}
+                            </div>
+                        )}
 
-                {validationError && (
-                    <div style={{ color: '#856404', backgroundColor: '#fff3cd', border: '1px solid #ffeeba', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '500', marginBottom: '20px' }}>⚠️ {validationError}</div>
-                )}
+                        {/* Loading */}
+                        {loading && (
+                            <p className="loading-text" aria-live="polite">
+                                <span aria-hidden="true">🌐</span> Syncing live satellite coordinates…
+                            </p>
+                        )}
 
-                {error && !validationError && (
-                    <div style={{ color: '#721c24', backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', padding: '12px 20px', borderRadius: '10px', fontSize: '14px', fontWeight: '500', marginBottom: '20px' }}>❌ {error}</div>
-                )}
-
-                {loading && (
-                    <div style={{ color: 'white', fontSize: '20px', textAlign: 'center', marginTop: '50px', fontWeight: '500' }}>Syncing live satellite coordinates...</div>
-                )}
-
-                {weatherData && !loading && (
-                    <>
-                        {/* --- DIŞ KAPSAYICI (Genişliği 1400'den 1650'ye çıkardık ki sağa yayılsın) --- */}
-                        <div style={{ maxWidth: '1650px', margin: '0 auto', width: '100%', padding: '0 20px' }}>
-
-                            {/* Şehir ve Tarih Başlığı + Favori Butonu */}
-                            <div style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.4)', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                <div>
-                                    <h2 style={{ margin: '0 0 5px 0', fontSize: '42px', fontWeight: '700' }}>{weatherData.cityName}</h2>
-                                    <p style={{ margin: 0, opacity: 0.9, fontSize: '18px' }}>{weatherData.dateStr}</p>
+                        {/* Weather data */}
+                        {weatherData && !loading && (
+                            <>
+                                {/* City heading */}
+                                <div className="city-heading">
+                                    <div>
+                                        <h1>{weatherData.cityName}</h1>
+                                        <p>
+                                            <time dateTime={new Date().toISOString().split('T')[0]}>
+                                                {weatherData.dateStr}
+                                            </time>
+                                        </p>
+                                    </div>
+                                    {user && (
+                                        <button
+                                            className="fav-btn"
+                                            onClick={toggleFavorite}
+                                            aria-label={
+                                                favorites.includes(weatherData.cityName)
+                                                    ? `Remove ${weatherData.cityName} from favorites`
+                                                    : `Add ${weatherData.cityName} to favorites`
+                                            }
+                                            aria-pressed={favorites.includes(weatherData.cityName)}
+                                        >
+                                            {favorites.includes(weatherData.cityName) ? '⭐' : '☆'}
+                                        </button>
+                                    )}
                                 </div>
 
-                                {/* FAVORİ (YILDIZ) BUTONU */}
-                                {user && (
-                                    <button
-                                        onClick={toggleFavorite}
-                                        style={{ background: 'transparent', border: 'none', fontSize: '32px', cursor: 'pointer', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))', transition: 'transform 0.2s' }}
-                                        title={favorites.includes(weatherData.cityName) ? "Remove from Favorites" : "Add to Favorites"}
+                                {/* Asymmetric grid */}
+                                <div className="weather-grid">
+
+                                    {/* LEFT: Main weather card */}
+                                    <article className="glass-card" aria-labelledby="current-weather-heading">
+                                        <h2 id="current-weather-heading" className="visually-hidden" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
+                                            Current weather in {weatherData.cityName}
+                                        </h2>
+                                        <div className="weather-icon-area">
+                                            <div className="weather-icon" role="img" aria-label={`Weather condition: ${weatherData.condition}`}>
+                                                {weatherData.isNight ? '🌙' : getWeatherIcon(weatherData.condition)}
+                                            </div>
+                                            <div className="weather-temp" aria-label={`Temperature: ${displayTemp(weatherData.temp)}`}>
+                                                {displayTemp(weatherData.temp)}
+                                            </div>
+                                            <div className="weather-feels">
+                                                Feels like {displayTemp(weatherData.feelsLike)}
+                                            </div>
+                                        </div>
+
+                                        <dl className="weather-stats">
+                                            <div className="weather-stat">
+                                                <dt>💨 Wind</dt>
+                                                <dd>{weatherData.wind}</dd>
+                                            </div>
+                                            <div className="weather-stat">
+                                                <dt>💧 Humidity</dt>
+                                                <dd>{weatherData.humidity}</dd>
+                                            </div>
+                                            <div className="weather-stat">
+                                                <dt>🌡️ Dew Point</dt>
+                                                <dd>{weatherData.dewPoint}</dd>
+                                            </div>
+                                            <div className="weather-stat">
+                                                <dt>⏲️ Pressure</dt>
+                                                <dd>{weatherData.pressure}</dd>
+                                            </div>
+                                        </dl>
+                                    </article>
+
+                                    {/* RIGHT: Forecasts + Radar */}
+                                    <div className="weather-right">
+
+                                        {/* Daily forecast */}
+                                        <section className="glass-panel" aria-labelledby="daily-heading">
+                                            <h2 id="daily-heading">📅 Daily Forecast</h2>
+                                            <div className="daily-grid" role="list">
+                                                {weatherData.forecast.map((f, i) => (
+                                                    <div key={i} className="daily-item" role="listitem" aria-label={`${f.day}: ${getWeatherIcon(f.condition)}, high ${formatTemperature(f.maxTemp)}`}>
+                                                        <div className="daily-day">{f.day}</div>
+                                                        <div className="daily-icon" role="img" aria-hidden="true">{getWeatherIcon(f.condition)}</div>
+                                                        <div className="daily-temp">{formatTemperature(f.maxTemp)}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+
+                                        {/* Hourly forecast */}
+                                        <section className="glass-panel" aria-labelledby="hourly-heading">
+                                            <h2 id="hourly-heading">🕒 Hourly Forecast</h2>
+                                            <div className="hourly-row" role="list">
+                                                {weatherData.hourly.map((h, i) => (
+                                                    <div key={i} className="hourly-item" role="listitem" aria-label={`${h.day} ${h.time}: ${formatTemperature(h.temp)}`}>
+                                                        <span className="hourly-label">{h.day}</span>
+                                                        <span className="hourly-time">{h.time}</span>
+                                                        <span className="hourly-icon" role="img" aria-hidden="true">{getWeatherIcon(h.condition)}</span>
+                                                        <span className="hourly-temp">{formatTemperature(h.temp)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+
+                                        {/* Radar */}
+                                        <section className="glass-panel" aria-labelledby="radar-heading">
+                                            <h2 id="radar-heading">📡 Local Radar &amp; Satellite</h2>
+                                            <div className="radar-frame">
+                                                <iframe
+                                                    title="Live Weather Radar – Windy.com"
+                                                    src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=${weatherData.lat}&lon=${weatherData.lon}`}
+                                                    loading="lazy"
+                                                    allowFullScreen
+                                                />
+                                            </div>
+                                        </section>
+
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </main>
+                {/* ════════════════ MAIN END ════════════════ */}
+
+                {/* ════════════════ FOOTER ════════════════ */}
+                <footer className="site-footer" role="contentinfo">
+                    <small>© 2026 SkyLine Weather Hub. All rights reserved.</small>
+                    <nav className="footer-links" aria-label="Legal links">
+                        <a href="#privacy">Privacy Policy</a>
+                        <a href="#terms">Terms of Service</a>
+                    </nav>
+                </footer>
+
+                {/* ════════════════ LOGIN MODAL ════════════════ */}
+                {showLoginModal && (
+                    <div
+                        className="modal-overlay"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="login-modal-title"
+                        onClick={(e) => { if (e.target === e.currentTarget) setShowLoginModal(false); }}
+                    >
+                        <div className="modal-box">
+                            <h2 id="login-modal-title" className="modal-title">
+                                SkyLine<span>.</span>
+                            </h2>
+
+                            <form
+                                className="login-form-fields"
+                                onSubmit={handleLogin}
+                                noValidate
+                                aria-label="Login form"
+                            >
+                                <div className="form-group">
+                                    <label htmlFor="login-username" className="form-label">Username</label>
+                                    <input
+                                        id="login-username"
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="e.g. Rumeysa"
+                                        value={loginInput}
+                                        onChange={(e) => setLoginInput(e.target.value)}
+                                        autoComplete="username"
+                                        autoFocus
+                                        required
+                                        aria-required="true"
+                                        aria-describedby={loginError ? 'login-error' : undefined}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label htmlFor="login-password" className="form-label">Password</label>
+                                    <input
+                                        id="login-password"
+                                        type="password"
+                                        className="form-input"
+                                        placeholder="••••••••"
+                                        value={passwordInput}
+                                        onChange={(e) => setPasswordInput(e.target.value)}
+                                        autoComplete="current-password"
+                                        required
+                                        aria-required="true"
+                                        aria-describedby={loginError ? 'login-error' : undefined}
+                                    />
+                                </div>
+
+                                {loginError && (
+                                    <div
+                                        id="login-error"
+                                        role="alert"
+                                        className="alert alert-error"
+                                        style={{ textAlign: 'center' }}
                                     >
-                                        {favorites.includes(weatherData.cityName) ? '⭐' : '☆'}
-                                    </button>
+                                        ⚠️ {loginError}
+                                    </div>
                                 )}
-                            </div>
 
-                            {/* ESKİZDEKİ ASİMETRİK GRID SİSTEMİ */}
-                            <main style={{
-                                display: 'grid',
-                                // KİLİT NOKTA: Sol tarafı 420px'e çiviledik (asla bozulmaz), sağ taraf ise '1fr' ile kalan tüm alanı yutarak sağa uzar!
-                                gridTemplateColumns: '420px 1fr',
-                                gap: '40px',
-                                alignItems: 'start'
-                            }}>
-
-                                {/* SOL KOLON: ANA HAVA DURUMU KARTI ... (Buradan aşağısı tamamen aynı kalacak) */}
-
-                                {/* SOL KOLON: ANA HAVA DURUMU KARTI */}
-                                <div style={{
-                                    background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '30px', padding: '50px 40px', color: 'white', border: '1px solid rgba(255,255,255,0.25)', boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-                                }}>
-                                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                                        {/* Gece/Gündüz kontrolü ve Hilal ikonu */}
-                                        {/* YENİ: weatherData.isNight kontrolü eklendi. weathermap api verisinde sys.pod = 'n' ise */}
-                                        <div className="animated-weather-icon" style={{ fontSize: '130px', lineHeight: 1, filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.3))' }}>
-                                            {/* useWeather hook'undan gelen isNight flag'ini kontrol ediyoruz */}
-                                            {weatherData.isNight ? '🌙' : getWeatherIcon(weatherData.condition)}
-                                        </div>
-
-                                        <div style={{ fontSize: '90px', fontWeight: '700', margin: '15px 0', textShadow: '0 4px 8px rgba(0,0,0,0.3)' }}>{formatTemperature(weatherData.temp)}</div>
-                                        <div style={{ fontSize: '22px', opacity: 0.9, fontWeight: '500' }}>Feeling like {formatTemperature(weatherData.feelsLike)}</div>
-                                    </div>
-
-                                    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '25px', borderTop: '2px solid rgba(255,255,255,0.15)', paddingTop: '30px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>💨 WIND</span><span style={{ fontWeight: '700' }}>{weatherData.wind}</span></div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>💧 HUMIDITY</span><span style={{ fontWeight: '700' }}>{weatherData.humidity}</span></div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>🌡️ DEW POINT</span><span style={{ fontWeight: '700' }}>{weatherData.dewPoint}</span></div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px' }}><span>⏲️ PRESSURE</span><span style={{ fontWeight: '700' }}>{weatherData.pressure}</span></div>
-                                    </div>
+                                <div className="login-form-actions">
+                                    <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.875rem', fontSize: '1rem', borderRadius: 'var(--radius-md)' }}>
+                                        Sign In
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn-cancel"
+                                        onClick={() => setShowLoginModal(false)}
+                                        aria-label="Cancel login"
+                                    >
+                                        Cancel
+                                    </button>
                                 </div>
-
-                                {/* SAĞ KOLON: 7-DAY -> HOURLY -> RADAR */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-
-                                    {/* 1. DAILY FORECAST */}
-                                    <div style={{ background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', padding: '25px', border: '1px solid rgba(255,255,255,0.25)' }}>
-                                        <h3 style={{ color: 'white', margin: '0 0 15px 0', fontSize: '18px', fontWeight: '600' }}>📅 Daily Forecast</h3>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                                            {weatherData.forecast.map((f, i) => (
-                                                <div key={i} style={{ flex: 1, color: 'white', textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: '12px 5px', borderRadius: '16px' }}>
-                                                    <div style={{ fontWeight: '700', fontSize: '14px' }}>{f.day}</div>
-                                                    <div style={{ fontSize: '28px', margin: '10px 0' }}>{getWeatherIcon(f.condition)}</div>
-                                                    <div style={{ fontWeight: '700', fontSize: '16px' }}>{formatTemperature(f.maxTemp)}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* 2. HOURLY FORECAST */}
-                                    <div style={{ background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', padding: '25px', border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
-                                        <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: '600' }}>🕒 Hourly Forecast</h3>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            {weatherData.hourly.map((h, i) => (
-                                                <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600', textTransform: 'uppercase' }}>{h.day}</span>
-                                                    <span style={{ fontSize: '15px', fontWeight: '500' }}>{h.time}</span>
-                                                    <span style={{ fontSize: '28px' }}>{getWeatherIcon(h.condition)}</span>
-                                                    <span style={{ fontSize: '18px', fontWeight: '700' }}>{formatTemperature(h.temp)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* 3. LOCAL RADAR & SATELLITE */}
-                                    <div style={{ background: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(16px)', borderRadius: '24px', padding: '25px', border: '1px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', color: 'white' }}>
-                                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>📡 Local Radar & Satellite</h3>
-                                        </div>
-                                        <div style={{ height: '380px', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
-                                            <iframe width="100%" height="100%" src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=${weatherData.lat}&lon=${weatherData.lon}`} frameBorder="0" title="Live Weather Radar"></iframe>
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </main>
+                            </form>
                         </div>
-                        {/* --- BURAYA KADAR KOPYALA --- */}
-                    </>
-                )}
-            </div>
-
-            {/* FOOTER BÖLÜMÜ */}
-            <footer style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 40px', backgroundColor: '#ffffff', color: '#64748b', fontSize: '13px', borderTop: '1px solid #e2e8f0' }}>
-                <span>© 2026 SkyLine Weather Hub. All rights reserved.</span>
-                <div style={{ display: 'flex', gap: '20px' }}>
-                    <span style={{ cursor: 'pointer' }}>Privacy Policy</span>
-                    <span style={{ cursor: 'pointer' }}>Terms of Service</span>
-                </div>
-            </footer>
-
-            {/* LOGIN MODAL EKRANI (ŞİFRELİ VERSİYON) */}
-            {showLoginModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-                    <div style={{ background: 'white', padding: '40px', borderRadius: '24px', width: '90%', maxWidth: '400px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
-
-                        <h2 style={{ margin: '0 0 25px 0', color: '#1e293b', textAlign: 'center', fontSize: '28px' }}>SkyLine<span style={{ color: '#0ea5e9' }}>.</span></h2>
-
-                        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-                            {/* KULLANICI ADI KISMI */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '14px', color: '#64748b', fontWeight: '600', marginLeft: '5px' }}>Username</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. Emre"
-                                    value={loginInput}
-                                    onChange={(e) => setLoginInput(e.target.value)}
-                                    style={{ padding: '14px 16px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '16px', outline: 'none', background: '#f8fafc', transition: 'border 0.2s' }}
-                                    onFocus={(e) => e.target.style.borderColor = '#0ea5e9'}
-                                    onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
-                                    autoFocus
-                                />
-                            </div>
-
-                            {/* ŞİFRE KISMI */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: '14px', color: '#64748b', fontWeight: '600', marginLeft: '5px' }}>Password</label>
-                                <input
-                                    type="password"
-                                    placeholder="••••••••"
-                                    value={passwordInput}
-                                    onChange={(e) => setPasswordInput(e.target.value)}
-                                    style={{ padding: '14px 16px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '16px', outline: 'none', background: '#f8fafc', transition: 'border 0.2s' }}
-                                    onFocus={(e) => e.target.style.borderColor = '#0ea5e9'}
-                                    onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
-                                />
-                            </div>
-                            {loginError && (
-                                <div style={{ background: '#fef2f2', border: '1px solid #f87171', color: '#ef4444', padding: '10px', borderRadius: '8px', fontSize: '14px', textAlign: 'center', fontWeight: '500' }}>
-                                    ⚠️ {loginError}
-                                </div>
-                            )}
-
-                            {/* BUTONLAR */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                                <button type="submit" style={{ background: '#0ea5e9', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
-                                    onMouseEnter={(e) => e.target.style.background = '#0284c7'}
-                                    onMouseLeave={(e) => e.target.style.background = '#0ea5e9'}
-                                >
-                                    Sign In
-                                </button>
-                                <button type="button" onClick={() => setShowLoginModal(false)} style={{ background: 'transparent', color: '#94a3b8', border: 'none', padding: '10px', cursor: 'pointer', fontWeight: '600', transition: 'color 0.2s' }}
-                                    onMouseEnter={(e) => e.target.style.color = '#64748b'}
-                                    onMouseLeave={(e) => e.target.style.color = '#94a3b8'}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-
-                        </form>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+
+            </div>
+        </>
     );
 }
 
